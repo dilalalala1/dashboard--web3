@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Web3 Total</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; background-color: #f5f5f5; }
+    h1 { color: #333; }
+    button {
+      background-color: #f6851b; color: white; border: none;
+      padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; margin: 10px;
+    }
+    button:hover { background-color: #e2761b; }
+    select, input {
+      padding: 8px; margin: 5px; font-size: 14px; border-radius: 5px; border: 1px solid #ccc;
+    }
+    .info, .section { margin-top: 20px; font-size: 18px; color: #333; }
+    table { margin: auto; border-collapse: collapse; background: white; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; }
+    th { background-color: #eee; }
+    .nft-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
+    .nft-card { border: 1px solid #ccc; background: white; padding: 10px; border-radius: 8px; width: 160px; }
+    .nft-card img { width: 100%; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>🧠 Dashboard Web3 Total</h1>
+
+  <div>
+    <label for="network">🌐 Réseau :</label>
+    <select id="network">
+      <option value="mainnet">Ethereum</option>
+      <option value="bsc">Binance Smart Chain</option>
+      <option value="polygon">Polygon</option>
+    </select>
+  </div>
+
+  <button id="connect-button">🔗 Connexion Metamask</button>
+  <button id="disconnect-button" style="display:none;">❌ Déconnexion</button>
+
+  <div class="info" id="wallet-address"></div>
+  <div class="info" id="wallet-balance"></div>
+
+  <div class="section">
+    <h2>📤 Envoyer de l'ETH</h2>
+    <input type="text" id="to-address" placeholder="Adresse destinataire">
+    <input type="text" id="amount" placeholder="Montant (ETH)">
+    <button id="send-button">Envoyer</button>
+    <div id="tx-status" class="info"></div>
+  </div>
+
+  <div class="section" id="token-list"></div>
+  <div class="section" id="nft-list"></div>
+
+  <script>
+    let currentAccount = null;
+    const apiKey = "IGDRyth5nccFYJiVpvRa8LV2tR1mXO8bxGfDu28yxIjWjqp2oGa2aWXxdNHrYTva";
+    const moralisKey = "test"; // Remplace par ta clé Moralis
+    const moralisUrl = "https://deep-index.moralis.io/api/v2";
+
+    const connectBtn = document.getElementById('connect-button');
+    const disconnectBtn = document.getElementById('disconnect-button');
+    const addressDiv = document.getElementById('wallet-address');
+    const balanceDiv = document.getElementById('wallet-balance');
+    const tokenListDiv = document.getElementById('token-list');
+    const nftListDiv = document.getElementById('nft-list');
+    const networkSelect = document.getElementById('network');
+    const sendBtn = document.getElementById('send-button');
+    const txStatus = document.getElementById('tx-status');
+
+    async function switchNetwork(net) {
+      const networks = { mainnet:{chainId:'0x1'}, bsc:{chainId:'0x38'}, polygon:{chainId:'0x89'} };
+      await ethereum.request({ method:'wallet_switchEthereumChain', params:[{chainId:networks[net].chainId}] });
+    }
+
+    async function getEthBalance(acc) {
+      const balWei = await ethereum.request({ method:'eth_getBalance', params:[acc,'latest'] });
+      balanceDiv.innerText = "💰 Solde ETH : " + (parseInt(balWei,16)/1e18).toFixed(5);
+    }
+
+    async function getTokens(acc) {
+      const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${acc}&page=1&offset=10&sort=desc&apikey=${apiKey}`;
+      const res = await fetch(url); const data = await res.json();
+      if (data.status === "1") {
+        const tokens = {};
+        data.result.forEach(tx => {
+          const sym = tx.tokenSymbol;
+          const val = parseFloat(tx.value)/Math.pow(10,tx.tokenDecimal);
+          tokens[sym] = (tokens[sym]||0)+val;
+        });
+        let html = "<h2>📦 Tokens ERC‑20</h2><table><tr><th>Token</th><th>Quantité</th></tr>";
+        for (let s in tokens) html += `<tr><td>${s}</td><td>${tokens[s].toFixed(4)}</td></tr>`;
+        tokenListDiv.innerHTML = html+"</table>";
+      } else tokenListDiv.innerText="❌ Impossible de récupérer les tokens";
+    }
+
+    async function getNFTs(acc) {
+      const res = await fetch(`${moralisUrl}/${acc}/nft?chain=eth&format=decimal`, {headers:{ "X-API-Key":moralisKey }});
+      const data = await res.json();
+      if (data.result?.length) {
+        let html="<h2>🎨 NFTs</h2><div class='nft-grid'>";
+        data.result.forEach(nft=>{
+          const meta = nft.metadata? JSON.parse(nft.metadata):null;
+          const img = meta?.image?.replace("ipfs://","https://ipfs.io/ipfs/")||"";
+          html+=`<div class='nft-card'><div>${nft.name||"NFT"}</div><img src="${img}"/></div>`;
+        });
+        nftListDiv.innerHTML=html+"</div>";
+      } else nftListDiv.innerText="Aucun NFT trouvé";
+    }
+
+    connectBtn.onclick = async ()=> {
+      if (window.ethereum) {
+        const accs = await ethereum.request({method:'eth_requestAccounts'});
+        currentAccount = accs[0];
+        addressDiv.innerText = "🔑 Adresse : " + currentAccount;
+        connectBtn.style.display='none'; disconnectBtn.style.display='inline-block';
+        await switchNetwork(networkSelect.value);
+        await getEthBalance(currentAccount);
+        await getTokens(currentAccount);
+        await getNFTs(currentAccount);
+      } else addressDiv.innerHTML="🦊 Installez Metamask : <a href='https://metamask.io'>ici</a>";
+    };
+
+    disconnectBtn.onclick = ()=> {
+      currentAccount=null;
+      addressDiv.innerText=balanceDiv.innerText=txStatus.innerText="";
+      tokenListDiv.innerHTML=nftListDiv.innerHTML="";
+      connectBtn.style.display='inline-block'; disconnectBtn.style.display='none';
+    };
+
+    sendBtn.onclick = async ()=>{
+      const to=document.getElementById('to-address').value;
+      const val=document.getElementById('amount').value;
+      if (!to||!val) { txStatus.innerText="⛔ Adresse ou montant manquant"; return; }
+      const tx = await ethereum.request({ method:'eth_sendTransaction',
+        params:[{from:currentAccount,to:to,value:'0x'+(BigInt(val*1e18)).toString(16)}] });
+      txStatus.innerText="✅ Tx envoyée : "+tx;
+    };
+  </script>
+
+</body>
+</html>
