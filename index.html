@@ -1,1 +1,123 @@
 
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Web3</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin-bottom: 20px; }
+        button { margin-top: 10px; padding: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Dashboard Web3</h2>
+    <div class="section">
+        <button onclick="connectMetamask()">🔌 Connecter MetaMask</button>
+        <p><strong>Adresse :</strong> <span id="userAddress">Non connectée</span></p>
+        <p><strong>Solde ETH :</strong> <span id="ethBalance">-</span></p>
+        <p><strong>Estimation en $ :</strong> <span id="usdEstimate">-</span></p>
+    </div>
+
+    <div class="section">
+        <h3>Tokens ERC-20</h3>
+        <ul id="tokenList">Chargement...</ul>
+    </div>
+
+    <div class="section">
+        <h3>NFTs</h3>
+        <ul id="nftList">Chargement...</ul>
+    </div>
+
+    <div class="section">
+        <h3>Transactions récentes</h3>
+        <ul id="txList">Chargement...</ul>
+    </div>
+
+<script>
+const API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjczODk1YWRjLThiMmYtNGVhNi1hYjkyLTk1ZDEyMzE3NTE1MyIsIm9yZ0lkIjoiNDU4MTA3IiwidXNlcklkIjoiNDcxMzEzIiwidHlwZUlkIjoiYzhlZTI0MWMtYTg0My00OWRhLWJkZmUtNzg0ZThhODE4Y2ViIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTE5MjMzNDcsImV4cCI6NDkwNzY4MzM0N30.5RcKbgyOhBrYirRGhK15qvE3VOj1ieOn_r6yhJTQzOE";
+
+let selectedAddress = null;
+
+async function connectMetamask() {
+    if (window.ethereum) {
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        selectedAddress = accounts[0];
+        document.getElementById("userAddress").innerText = selectedAddress;
+        loadEthBalance();
+        loadERC20Tokens();
+        loadNFTs();
+        loadTransactions();
+    } else {
+        alert("MetaMask n'est pas installé !");
+    }
+}
+
+async function loadEthBalance() {
+    const web3 = new Web3(window.ethereum);
+    const balance = await web3.eth.getBalance(selectedAddress);
+    const ethValue = web3.utils.fromWei(balance, "ether");
+    document.getElementById("ethBalance").innerText = ethValue;
+
+    const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+    const price = response.data.ethereum.usd;
+    document.getElementById("usdEstimate").innerText = "$ " + (ethValue * price).toFixed(2);
+}
+
+async function loadERC20Tokens() {
+    try {
+        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${selectedAddress}/erc20`, {
+            headers: { "X-API-Key": API_KEY }
+        });
+        const tokens = res.data;
+        const tokenList = document.getElementById("tokenList");
+        tokenList.innerHTML = "";
+        tokens.forEach(token => {
+            const li = document.createElement("li");
+            li.innerText = `${token.name} (${token.symbol}): ${token.balance / Math.pow(10, token.decimals)}`;
+            tokenList.appendChild(li);
+        });
+    } catch (e) {
+        document.getElementById("tokenList").innerText = "Erreur de chargement";
+    }
+}
+
+async function loadNFTs() {
+    try {
+        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${selectedAddress}/nft`, {
+            headers: { "X-API-Key": API_KEY }
+        });
+        const nfts = res.data.result;
+        const nftList = document.getElementById("nftList");
+        nftList.innerHTML = "";
+        nfts.forEach(nft => {
+            const li = document.createElement("li");
+            li.innerText = `NFT ${nft.name || "Sans nom"} - Collection: ${nft.symbol}`;
+            nftList.appendChild(li);
+        });
+    } catch (e) {
+        document.getElementById("nftList").innerText = "Erreur de chargement";
+    }
+}
+
+async function loadTransactions() {
+    try {
+        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${selectedAddress}`, {
+            headers: { "X-API-Key": API_KEY }
+        });
+        const txList = document.getElementById("txList");
+        txList.innerHTML = "";
+        res.data.result.slice(0, 5).forEach(tx => {
+            const li = document.createElement("li");
+            li.innerText = `Hash: ${tx.hash} - De: ${tx.from_address} → À: ${tx.to_address}`;
+            txList.appendChild(li);
+        });
+    } catch (e) {
+        document.getElementById("txList").innerText = "Erreur de chargement";
+    }
+}
+</script>
+</body>
+</html>
