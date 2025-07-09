@@ -1,119 +1,126 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mon Dashboard Web3</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Dashboard Web3</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    .section { margin-bottom: 30px; }
-    .token, .nft { margin-top: 10px; }
-    button { padding: 10px; margin-top: 10px; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f7f7f7; color: #333; }
+    button { padding: 10px 20px; font-size: 16px; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; }
+    .adresse { font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>Dashboard Web3</h1>
-  <div class="section">
-    <button onclick="connectWallet()">🔗 Connecter MetaMask</button>
-    <p id="walletAddress">Adresse : Non connectée</p>
-    <p id="ethBalance">Solde ETH : --</p>
-    <p id="usdBalance">Estimation en $ : --</p>
+  <div class="card">
+    <h2>Dashboard Web3</h2>
+    <button onclick="connecterMetamask()">🔗 Connecter MetaMask</button>
+    <p class="adresse" id="adresse">Adresse : Non connectée</p>
+    <p id="solde">Solde ETH : -</p>
+    <p id="estimation">Estimation en $ : -</p>
   </div>
 
-  <div class="section">
+  <div class="card">
     <h2>Tokens ERC-20</h2>
-    <div id="tokens">Chargement...</div>
+    <ul id="tokens">Chargement...</ul>
   </div>
 
-  <div class="section">
+  <div class="card">
     <h2>NFTs</h2>
-    <div id="nfts">Chargement...</div>
+    <ul id="nfts">Chargement...</ul>
   </div>
 
-  <div class="section">
+  <div class="card">
     <h2>Transactions récentes</h2>
-    <div id="transactions">Chargement...</div>
+    <ul id="transactions">Chargement...</ul>
   </div>
 
-  <script>
-    const MORALIS_API = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjczODk1YWRjLThiMmYtNGVhNi1hYjkyLTk1ZDEyMzE3NTE1MyIsIm9yZ0lkIjoiNDU4MTA3IiwidXNlcklkIjoiNDcxMzEzIiwidHlwZUlkIjoiYzhlZTI0MWMtYTg0My00OWRhLWJkZmUtNzg0ZThhODE4Y2ViIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTE5MjMzNDcsImV4cCI6NDkwNzY4MzM0N30.5RcKbgyOhBrYirRGhK15qvE3VOj1ieOn_r6yhJTQzOE";
+<script>
+const MORALIS_API_KEY = "Votre_clé_API_Moralis_ici";
 
-    let userAddress = "";
+async function connecterMetamask() {
+  if (window.ethereum) {
+    try {
+      const comptes = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const adresse = comptes[0];
+      document.getElementById("adresse").innerText = "Adresse : " + adresse;
 
-    async function connectWallet() {
-      if (window.ethereum) {
-        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-        userAddress = accounts[0];
-        document.getElementById("walletAddress").innerText = "Adresse : " + userAddress;
-        getEthBalance();
-        getTokens();
-        getNFTs();
-        getTransactions();
-      } else {
-        alert("MetaMask n’est pas installé !");
-      }
-    }
-
-    async function getEthBalance() {
       const web3 = new Web3(window.ethereum);
-      const balance = await web3.eth.getBalance(userAddress);
-      const eth = web3.utils.fromWei(balance, "ether");
-      document.getElementById("ethBalance").innerText = `Solde ETH : ${eth}`;
-      document.getElementById("usdBalance").innerText = `Estimation en $ : ${(eth * 3200).toFixed(2)}`;
-    }
+      const soldeWei = await web3.eth.getBalance(adresse);
+      const soldeETH = web3.utils.fromWei(soldeWei, "ether");
+      document.getElementById("solde").innerText = "Solde ETH : " + parseFloat(soldeETH).toFixed(4);
 
-    async function getTokens() {
-      try {
-        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${userAddress}/erc20`, {
-          headers: { "X-API-Key": MORALIS_API }
-        });
-        const container = document.getElementById("tokens");
-        container.innerHTML = "";
-        res.data.forEach(token => {
-          const amount = token.balance / (10 ** token.decimals);
-          container.innerHTML += `<div class='token'>🔹 ${token.name} (${token.symbol}) : ${amount}</div>`;
-        });
-        if (res.data.length === 0) container.innerHTML = "Aucun token trouvé.";
-      } catch {
-        document.getElementById("tokens").innerText = "Erreur lors du chargement des tokens.";
-      }
-    }
+      const ethUSD = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+      const prixUSD = ethUSD.data.ethereum.usd;
+      document.getElementById("estimation").innerText = "Estimation en $ : " + (soldeETH * prixUSD).toFixed(2);
 
-    async function getNFTs() {
-      try {
-        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${userAddress}/nft`, {
-          headers: { "X-API-Key": MORALIS_API }
-        });
-        const container = document.getElementById("nfts");
-        container.innerHTML = "";
-        res.data.result.forEach(nft => {
-          container.innerHTML += `<div class='nft'>🎨 ${nft.name || "NFT"} (token ID: ${nft.token_id})</div>`;
-        });
-        if (res.data.result.length === 0) container.innerHTML = "Aucun NFT trouvé.";
-      } catch {
-        document.getElementById("nfts").innerText = "Erreur lors du chargement des NFTs.";
-      }
-    }
+      chargerERC20(adresse);
+      chargerNFTs(adresse);
+      chargerTransactions(adresse);
 
-    async function getTransactions() {
-      try {
-        const res = await axios.get(`https://deep-index.moralis.io/api/v2.2/${userAddress}`, {
-          headers: { "X-API-Key": MORALIS_API }
-        });
-        const txs = res.data.result || [];
-        const container = document.getElementById("transactions");
-        container.innerHTML = "";
-        txs.slice(0, 5).forEach(tx => {
-          container.innerHTML += `<div>🔁 ${tx.hash.substring(0, 10)}... → <a href='https://etherscan.io/tx/${tx.hash}' target='_blank'>Voir</a></div>`;
-        });
-        if (txs.length === 0) container.innerHTML = "Aucune transaction récente.";
-      } catch {
-        document.getElementById("transactions").innerText = "Erreur lors du chargement des transactions.";
-      }
+    } catch (error) {
+      alert("Erreur connexion : " + error.message);
     }
-  </script>
+  } else {
+    alert("MetaMask non détecté !");
+  }
+}
+
+async function chargerERC20(adresse) {
+  const url = `https://deep-index.moralis.io/api/v2.2/${adresse}/erc20`;
+  try {
+    const res = await axios.get(url, {
+      headers: { "X-API-Key": MORALIS_API_KEY }
+    });
+    const liste = document.getElementById("tokens");
+    liste.innerHTML = "";
+    res.data.forEach(token => {
+      const li = document.createElement("li");
+      li.textContent = `${token.name} (${token.symbol}) : ${token.balance / 10 ** token.decimals}`;
+      liste.appendChild(li);
+    });
+  } catch (e) {
+    document.getElementById("tokens").innerText = "Erreur de chargement";
+  }
+}
+
+async function chargerNFTs(adresse) {
+  const url = `https://deep-index.moralis.io/api/v2.2/${adresse}/nft?chain=eth&format=decimal`;
+  try {
+    const res = await axios.get(url, {
+      headers: { "X-API-Key": MORALIS_API_KEY }
+    });
+    const liste = document.getElementById("nfts");
+    liste.innerHTML = "";
+    res.data.result.forEach(nft => {
+      const li = document.createElement("li");
+      li.textContent = `NFT ${nft.name || nft.token_id}`;
+      liste.appendChild(li);
+    });
+  } catch (e) {
+    document.getElementById("nfts").innerText = "Erreur de chargement";
+  }
+}
+
+async function chargerTransactions(adresse) {
+  const url = `https://deep-index.moralis.io/api/v2.2/${adresse}?chain=eth`;
+  try {
+    const res = await axios.get(url, {
+      headers: { "X-API-Key": MORALIS_API_KEY }
+    });
+    const liste = document.getElementById("transactions");
+    liste.innerHTML = "";
+    res.data.result.slice(0, 5).forEach(tx => {
+      const li = document.createElement("li");
+      li.textContent = `Tx vers ${tx.to} : ${(tx.value / 1e18).toFixed(4)} ETH`;
+      liste.appendChild(li);
+    });
+  } catch (e) {
+    document.getElementById("transactions").innerText = "Erreur de chargement";
+  }
+}
+</script>
 </body>
 </html>
