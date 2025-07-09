@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Web3 - Complet avec Alertes</title>
+</head>
+<body style="font-family: Arial, sans-serif;">
+  <h1>🌐 Dashboard Web3</h1>
+  <div id="walletInfo"><strong>Connexion...</strong></div>
+  <div id="alerts" style="margin-top: 20px; color: red;"></div>
+  <hr />
+  <h2>💰 Solde ETH et Tokens</h2>
+  <div id="balance"></div>
+  <div id="tokensList"></div>
+  <hr />
+  <h2>🖼️ NFTs</h2>
+  <div id="nftsList"></div>
+  <hr />
+  <h2>📊 Évolution (exemple simulé)</h2>
+  <canvas id="chart" width="400" height="150"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module">
+    import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    const signer = provider.getSigner();
+    const address = await signer.getAddress();
+
+    document.getElementById("walletInfo").innerText = `🔗 Wallet connecté : ${address}`;
+
+    // ETH Balance
+    const ethBalance = await provider.getBalance(address);
+    const eth = ethers.utils.formatEther(ethBalance);
+    document.getElementById("balance").innerHTML = `<p><strong>Solde ETH :</strong> ${eth} ETH</p>`;
+
+    // Alert ETH faible
+    if (parseFloat(eth) < 0.05) {
+      document.getElementById("alerts").innerHTML += '⚠️ Solde ETH très faible !<br>';
+    }
+
+    // Moralis API
+    const apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjczODk1YWRjLThiMmYtNGVhNi1hYjkyLTk1ZDEyMzE3NTE1MyIsIm9yZ0lkIjoiNDU4MTA3IiwidXNlcklkIjoiNDcxMzEzIiwidHlwZUlkIjoiYzhlZTI0MWMtYTg0My00OWRhLWJkZmUtNzg0ZThhODE4Y2ViIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NTE5MjMzNDcsImV4cCI6NDkwNzY4MzM0N30.5RcKbgyOhBrYirRGhK15qvE3VOj1ieOn_r6yhJTQzOE';
+
+    // Tokens ERC-20
+    const tokenRes = await fetch(`https://deep-index.moralis.io/api/v2.2/${address}/erc20`, {
+      headers: { "X-API-Key": apiKey }
+    });
+    const tokens = await tokenRes.json();
+
+    let tokenHtml = '';
+    tokens.forEach(token => {
+      const percentChange = Math.floor(Math.random() * 25); // simulation de pump
+      tokenHtml += `<p>🪙 ${token.symbol} : ${token.balance / (10 ** token.decimals)} ${token.symbol}`;
+      if (percentChange >= 10) {
+        tokenHtml += ` <span style="color:orange">🔥 (+${percentChange}%)</span>`;
+        document.getElementById("alerts").innerHTML += `🔥 Le token ${token.symbol} pourrait être en pump !<br>`;
+      }
+      tokenHtml += '</p>';
+    });
+    document.getElementById("tokensList").innerHTML = tokenHtml;
+
+    // NFTs
+    const nftRes = await fetch(`https://deep-index.moralis.io/api/v2.2/${address}/nft`, {
+      headers: { "X-API-Key": apiKey }
+    });
+    const nftData = await nftRes.json();
+    let nftHtml = '';
+    if (nftData.result.length > 0) {
+      document.getElementById("alerts").innerHTML += '🖼️ Nouveau NFT détecté dans ton wallet !<br>';
+      nftData.result.forEach(nft => {
+        nftHtml += `<p>${nft.name || 'NFT'} - ${nft.token_id}</p>`;
+      });
+    } else {
+      nftHtml = '<p>Aucun NFT trouvé.</p>';
+    }
+    document.getElementById("nftsList").innerHTML = nftHtml;
+
+    // Graphique simulé
+    const ctx = document.getElementById("chart").getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
+        datasets: [{
+          label: "Solde ETH (simulation)",
+          data: [0.03, 0.04, 0.045, 0.042, 0.05, 0.048, parseFloat(eth)],
+          borderWidth: 2
+        }]
+      }
+    });
+  </script>
+</body>
+</html>
